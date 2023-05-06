@@ -1032,15 +1032,28 @@ void InstructionSelector::InitializeCallBuffer(Node* call, CallBuffer* buffer,
                     : g.UseRegister(callee));
       break;
 #endif  // V8_ENABLE_WEBASSEMBLY
-    case CallDescriptor::kCallBuiltinPointer:
+    case CallDescriptor::kCallBuiltinPointer: {
       // The common case for builtin pointers is to have the target in a
       // register. If we have a constant, we use a register anyway to simplify
       // related code.
-      buffer->instruction_args.push_back(
-          call_use_fixed_target_reg
-              ? g.UseFixed(callee, kJavaScriptCallCodeStartRegister)
-              : g.UseRegister(callee));
+      LinkageLocation location = buffer->descriptor->GetInputLocation(0);
+      bool location_is_fixed_register =
+          location.IsRegister() && !location.IsAnyRegister();
+      InstructionOperand op;
+      // We must check {location_is_fixed_register} first, because calls from
+      // Wasm to JS-linkage builtins specify a particular register, *and*
+      // set the {call_use_fixed_target_reg} flag, but don't want their choice
+      // of register to be overridden with {kJavaScriptCallCodeStartRegister}.
+      if (location_is_fixed_register) {
+        op = g.UseLocation(callee, location);
+      } else if (call_use_fixed_target_reg) {
+        op = g.UseFixed(callee, kJavaScriptCallCodeStartRegister);
+      } else {
+        op = g.UseRegister(callee);
+      }
+      buffer->instruction_args.push_back(op);
       break;
+    }
     case CallDescriptor::kCallJSFunction:
       buffer->instruction_args.push_back(
           g.UseLocation(callee, buffer->descriptor->GetInputLocation(0)));
@@ -1483,6 +1496,8 @@ void InstructionSelector::VisitNode(Node* node) {
     }
     case IrOpcode::kStore:
       return VisitStore(node);
+    case IrOpcode::kStorePair:
+      return VisitStorePair(node);
     case IrOpcode::kProtectedStore:
     case IrOpcode::kStoreTrapOnNull:
       return VisitProtectedStore(node);
@@ -2386,10 +2401,78 @@ void InstructionSelector::VisitNode(Node* node) {
 
       // SIMD256
 #if V8_TARGET_ARCH_X64
+    case IrOpcode::kF64x4Add:
+      return MarkAsSimd256(node), VisitF64x4Add(node);
     case IrOpcode::kF32x8Add:
       return MarkAsSimd256(node), VisitF32x8Add(node);
+    case IrOpcode::kI64x4Add:
+      return MarkAsSimd256(node), VisitI64x4Add(node);
+    case IrOpcode::kI32x8Add:
+      return MarkAsSimd256(node), VisitI32x8Add(node);
+    case IrOpcode::kI16x16Add:
+      return MarkAsSimd256(node), VisitI16x16Add(node);
+    case IrOpcode::kI8x32Add:
+      return MarkAsSimd256(node), VisitI8x32Add(node);
+    case IrOpcode::kF64x4Sub:
+      return MarkAsSimd256(node), VisitF64x4Sub(node);
     case IrOpcode::kF32x8Sub:
       return MarkAsSimd256(node), VisitF32x8Sub(node);
+    case IrOpcode::kI64x4Sub:
+      return MarkAsSimd256(node), VisitI64x4Sub(node);
+    case IrOpcode::kI32x8Sub:
+      return MarkAsSimd256(node), VisitI32x8Sub(node);
+    case IrOpcode::kI16x16Sub:
+      return MarkAsSimd256(node), VisitI16x16Sub(node);
+    case IrOpcode::kI8x32Sub:
+      return MarkAsSimd256(node), VisitI8x32Sub(node);
+    case IrOpcode::kF64x4Mul:
+      return MarkAsSimd256(node), VisitF64x4Mul(node);
+    case IrOpcode::kF32x8Mul:
+      return MarkAsSimd256(node), VisitF32x8Mul(node);
+    case IrOpcode::kI64x4Mul:
+      return MarkAsSimd256(node), VisitI64x4Mul(node);
+    case IrOpcode::kI32x8Mul:
+      return MarkAsSimd256(node), VisitI32x8Mul(node);
+    case IrOpcode::kI16x16Mul:
+      return MarkAsSimd256(node), VisitI16x16Mul(node);
+    case IrOpcode::kF32x8Div:
+      return MarkAsSimd256(node), VisitF32x8Div(node);
+    case IrOpcode::kF64x4Div:
+      return MarkAsSimd256(node), VisitF64x4Div(node);
+    case IrOpcode::kI16x16AddSatS:
+      return MarkAsSimd256(node), VisitI16x16AddSatS(node);
+    case IrOpcode::kI8x32AddSatS:
+      return MarkAsSimd256(node), VisitI8x32AddSatS(node);
+    case IrOpcode::kI16x16AddSatU:
+      return MarkAsSimd256(node), VisitI16x16AddSatU(node);
+    case IrOpcode::kI8x32AddSatU:
+      return MarkAsSimd256(node), VisitI8x32AddSatU(node);
+    case IrOpcode::kI16x16SubSatS:
+      return MarkAsSimd256(node), VisitI16x16SubSatS(node);
+    case IrOpcode::kI8x32SubSatS:
+      return MarkAsSimd256(node), VisitI8x32SubSatS(node);
+    case IrOpcode::kI16x16SubSatU:
+      return MarkAsSimd256(node), VisitI16x16SubSatU(node);
+    case IrOpcode::kI8x32SubSatU:
+      return MarkAsSimd256(node), VisitI8x32SubSatU(node);
+    case IrOpcode::kF64x4ConvertI32x4S:
+      return MarkAsSimd256(node), VisitF64x4ConvertI32x4S(node);
+    case IrOpcode::kF32x8SConvertI32x8:
+      return MarkAsSimd256(node), VisitF32x8SConvertI32x8(node);
+    case IrOpcode::kF32x4DemoteF64x4:
+      return MarkAsSimd256(node), VisitF32x4DemoteF64x4(node);
+    case IrOpcode::kI64x4SConvertI32x4:
+      return MarkAsSimd256(node), VisitI64x4SConvertI32x4(node);
+    case IrOpcode::kI64x4UConvertI32x4:
+      return MarkAsSimd256(node), VisitI64x4UConvertI32x4(node);
+    case IrOpcode::kI32x8SConvertI16x8:
+      return MarkAsSimd256(node), VisitI32x8SConvertI16x8(node);
+    case IrOpcode::kI32x8UConvertI16x8:
+      return MarkAsSimd256(node), VisitI32x8UConvertI16x8(node);
+    case IrOpcode::kI16x16SConvertI8x16:
+      return MarkAsSimd256(node), VisitI16x16SConvertI8x16(node);
+    case IrOpcode::kI16x16UConvertI8x16:
+      return MarkAsSimd256(node), VisitI16x16UConvertI8x16(node);
 #endif  //  V8_TARGET_ARCH_X64
     default:
       FATAL("Unexpected operator #%d:%s @ node #%d", node->opcode(),
@@ -2963,6 +3046,9 @@ void InstructionSelector::VisitCall(Node* node, BasicBlock* handler) {
   // Improve constant pool and the heuristics in the register allocator
   // for where to emit constants.
   CallBufferFlags call_buffer_flags(kCallCodeImmediate | kCallAddressImmediate);
+  if (flags & CallDescriptor::kFixedTargetRegister) {
+    call_buffer_flags |= kCallFixedTargetRegister;
+  }
   InitializeCallBuffer(node, &buffer, call_buffer_flags);
 
   EmitPrepareArguments(&buffer.pushed_nodes, call_descriptor, node);

@@ -663,7 +663,7 @@ void CodeGenerator::BailoutIfDeoptimized() {
   int offset = InstructionStream::kCodeOffset - InstructionStream::kHeaderSize;
   __ push(eax);  // Push eax so we can use it as a scratch register.
   __ mov(eax, Operand(kJavaScriptCallCodeStartRegister, offset));
-  __ test(FieldOperand(eax, Code::kKindSpecificFlagsOffset),
+  __ test(FieldOperand(eax, Code::kFlagsOffset),
           Immediate(1 << Code::kMarkedForDeoptimizationBit));
   __ pop(eax);  // Restore eax.
 
@@ -700,7 +700,11 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
     case kArchCallBuiltinPointer: {
       DCHECK(!HasImmediateInput(instr, 0));
       Register builtin_index = i.InputRegister(0);
-      __ CallBuiltinByIndex(builtin_index);
+      Register target =
+          instr->HasCallDescriptorFlag(CallDescriptor::kFixedTargetRegister)
+              ? kJavaScriptCallCodeStartRegister
+              : builtin_index;
+      __ CallBuiltinByIndex(builtin_index, target);
       RecordCallPosition(instr);
       frame_access_state()->ClearSPDelta();
       break;

@@ -21,6 +21,7 @@
 #include "src/heap/marking-barrier.h"
 #include "src/heap/marking-visitor-inl.h"
 #include "src/heap/marking-visitor.h"
+#include "src/heap/memory-chunk-layout.h"
 #include "src/heap/memory-chunk.h"
 #include "src/heap/object-stats.h"
 #include "src/heap/objects-visiting-inl.h"
@@ -62,8 +63,7 @@ IncrementalMarking::IncrementalMarking(Heap* heap, WeakObjects* weak_objects)
       atomic_marking_state_(heap->atomic_marking_state()) {}
 
 void IncrementalMarking::MarkBlackBackground(HeapObject obj, int object_size) {
-  CHECK(atomic_marking_state()->TryMark(obj) &&
-        atomic_marking_state()->GreyToBlack(obj));
+  CHECK(atomic_marking_state()->TryMark(obj));
   IncrementLiveBytesBackground(MemoryChunk::FromHeapObject(obj),
                                static_cast<intptr_t>(object_size));
 }
@@ -217,40 +217,42 @@ void IncrementalMarking::MarkRoots() {
     heap_->IterateRoots(
         &visitor,
         base::EnumSet<SkipRoot>{SkipRoot::kStack, SkipRoot::kMainThreadHandles,
-                                SkipRoot::kWeak});
+                                SkipRoot::kTracedHandles, SkipRoot::kWeak,
+                                SkipRoot::kReadOnlyBuiltins});
   } else {
     heap_->IterateRoots(
         &visitor, base::EnumSet<SkipRoot>{
                       SkipRoot::kStack, SkipRoot::kMainThreadHandles,
                       SkipRoot::kWeak, SkipRoot::kExternalStringTable,
-                      SkipRoot::kGlobalHandles, SkipRoot::kOldGeneration});
+                      SkipRoot::kGlobalHandles, SkipRoot::kTracedHandles,
+                      SkipRoot::kOldGeneration, SkipRoot::kReadOnlyBuiltins});
 
     isolate()->global_handles()->IterateYoungStrongAndDependentRoots(&visitor);
     isolate()->traced_handles()->IterateYoungRoots(&visitor);
 
     std::vector<PageMarkingItem> marking_items;
-    RememberedSet<OLD_TO_NEW>::IterateMemoryChunks(
+
+    RememberedSetOperations::IterateOldMemoryChunks(
         heap(), [&marking_items](MemoryChunk* chunk) {
-          if (chunk->slot_set<OLD_TO_NEW>()) {
+          if (chunk->slot_set<OLD_TO_NEW>() ||
+              chunk->slot_set<OLD_TO_NEW_BACKGROUND>()) {
             marking_items.emplace_back(
                 chunk, PageMarkingItem::SlotsType::kRegularSlots);
-          } else {
-            chunk->ReleaseInvalidatedSlots<OLD_TO_NEW>();
           }
-
           if (chunk->typed_slot_set<OLD_TO_NEW>()) {
             marking_items.emplace_back(chunk,
                                        PageMarkingItem::SlotsType::kTypedSlots);
           }
         });
 
-    std::vector<YoungGenerationMarkingTask> tasks;
+    std::vector<std::unique_ptr<YoungGenerationMarkingTask>> tasks;
     for (size_t i = 0; i < (v8_flags.parallel_marking
                                 ? MinorMarkCompactCollector::kMaxParallelTasks
                                 : 1);
          ++i) {
-      tasks.emplace_back(isolate(), heap(),
-                         minor_collector_->marking_worklists());
+      tasks.emplace_back(std::make_unique<YoungGenerationMarkingTask>(
+          isolate(), heap(), minor_collector_->marking_worklists(),
+          minor_collector_->ephemeron_table_list()));
     }
     V8::GetCurrentPlatform()
         ->CreateJob(v8::TaskPriority::kUserBlocking,
@@ -259,8 +261,8 @@ void IncrementalMarking::MarkRoots() {
                         std::move(marking_items),
                         YoungMarkingJobType::kIncremental, tasks))
         ->Join();
-    for (YoungGenerationMarkingTask& task : tasks) {
-      task.Finalize();
+    for (auto& task : tasks) {
+      task->Finalize();
     }
   }
 }
@@ -474,6 +476,15 @@ void IncrementalMarking::UpdateMarkingWorklistAfterYoungGenGC() {
         // Object got promoted into the shared heap. Drop it from the client
         // heap marking worklist.
         return false;
+      }
+      // For any object not a DescriptorArray, transferring the object always
+      // increments live bytes as the marked state cannot distinguish fully
+      // processed from to-be-processed. Decrement the counter for such objects
+      // here.
+      if (!dest.IsDescriptorArray()) {
+        atomic_marking_state()->IncrementLiveBytes(
+            MemoryChunk::cast(BasicMemoryChunk::FromHeapObject(dest)),
+            -ALIGN_TO_ALLOCATION_ALIGNMENT(dest.Size()));
       }
       *out = dest;
       return true;
