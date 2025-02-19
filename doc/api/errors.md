@@ -61,7 +61,7 @@ Errors that occur within _Asynchronous APIs_ may be reported in multiple ways:
   <!-- eslint-disable no-useless-return -->
 
   ```js
-  const fs = require('fs/promises');
+  const fs = require('node:fs/promises');
 
   (async () => {
     let data;
@@ -2095,11 +2095,15 @@ does not consist of exactly two elements.
 added:
  - v23.0.0
  - v22.10.0
+changes:
+    - version:
+      - v23.7.0
+      - v22.14.0
+      pr-url: https://github.com/nodejs/node/pull/56610
+      description: This error is no longer thrown on valid yet unsupported syntax.
 -->
 
-The provided TypeScript syntax is not valid or unsupported.
-This could happen when using TypeScript syntax that requires
-transformation with [type-stripping][].
+The provided TypeScript syntax is not valid.
 
 <a id="ERR_INVALID_URI"></a>
 
@@ -2115,6 +2119,13 @@ An invalid URL was passed to the [WHATWG][WHATWG URL API] [`URL`
 constructor][`new URL(input)`] or the legacy [`url.parse()`][] to be parsed.
 The thrown error object typically has an additional property `'input'` that
 contains the URL that failed to parse.
+
+<a id="ERR_INVALID_URL_PATTERN"></a>
+
+### `ERR_INVALID_URL_PATTERN`
+
+An invalid URLPattern was passed to the [WHATWG][WHATWG URL API] \[`URLPattern`
+constructor]\[`new URLPattern(input)`] to be parsed.
 
 <a id="ERR_INVALID_URL_SCHEME"></a>
 
@@ -2155,6 +2166,12 @@ An attempt was made to open an IPC communication channel with a synchronously
 forked Node.js process. See the documentation for the [`child_process`][] module
 for more information.
 
+<a id="ERR_IP_BLOCKED"></a>
+
+### `ERR_IP_BLOCKED`
+
+IP is blocked by `net.BlockList`.
+
 <a id="ERR_LOADER_CHAIN_INCOMPLETE"></a>
 
 ### `ERR_LOADER_CHAIN_INCOMPLETE`
@@ -2167,6 +2184,18 @@ added:
 
 An ESM loader hook returned without calling `next()` and without explicitly
 signaling a short circuit.
+
+<a id="ERR_LOAD_SQLITE_EXTENSION"></a>
+
+### `ERR_LOAD_SQLITE_EXTENSION`
+
+<!-- YAML
+added:
+  - v23.5.0
+  - v22.13.0
+-->
+
+An error occurred while loading a SQLite extension.
 
 <a id="ERR_MEMORY_ALLOCATION_FAILED"></a>
 
@@ -2337,7 +2366,9 @@ compiled with ICU support.
 ### `ERR_NO_TYPESCRIPT`
 
 <!-- YAML
-added: v23.0.0
+added:
+  - v23.0.0
+  - v22.12.0
 -->
 
 An attempt was made to use features that require [Native TypeScript support][], but Node.js was not
@@ -2436,6 +2467,20 @@ Accessing `Object.prototype.__proto__` has been forbidden using
 [`Object.setPrototypeOf`][] should be used to get and set the prototype of an
 object.
 
+<a id="ERR_QUIC_APPLICATION_ERROR"></a>
+
+### `ERR_QUIC_APPLICATION_ERROR`
+
+<!-- YAML
+added:
+  - v23.4.0
+  - v22.13.0
+-->
+
+> Stability: 1 - Experimental
+
+A QUIC application error occurred.
+
 <a id="ERR_QUIC_CONNECTION_FAILED"></a>
 
 ### `ERR_QUIC_CONNECTION_FAILED`
@@ -2478,6 +2523,34 @@ added:
 
 Opening a QUIC stream failed.
 
+<a id="ERR_QUIC_TRANSPORT_ERROR"></a>
+
+### `ERR_QUIC_TRANSPORT_ERROR`
+
+<!-- YAML
+added:
+  - v23.4.0
+  - v22.13.0
+-->
+
+> Stability: 1 - Experimental
+
+A QUIC transport error occurred.
+
+<a id="ERR_QUIC_VERSION_NEGOTIATION_ERROR"></a>
+
+### `ERR_QUIC_VERSION_NEGOTIATION_ERROR`
+
+<!-- YAML
+added:
+  - v23.4.0
+  - v22.13.0
+-->
+
+> Stability: 1 - Experimental
+
+A QUIC session failed because version negotiation is required.
+
 <a id="ERR_REQUIRE_ASYNC_MODULE"></a>
 
 ### `ERR_REQUIRE_ASYNC_MODULE`
@@ -2512,7 +2585,9 @@ module, and should be done lazily in an inner function.
 
 <!-- YAML
 changes:
-  - version: v23.0.0
+  - version:
+    - v23.0.0
+    - v22.12.0
     pr-url: https://github.com/nodejs/node/pull/55085
     description: require() now supports loading synchronous ES modules by default.
 -->
@@ -2764,25 +2839,6 @@ reports.
 An unspecified or non-specific system error has occurred within the Node.js
 process. The error object will have an `err.info` object property with
 additional details.
-
-<a id="ERR_TAP_LEXER_ERROR"></a>
-
-### `ERR_TAP_LEXER_ERROR`
-
-An error representing a failing lexer state.
-
-<a id="ERR_TAP_PARSER_ERROR"></a>
-
-### `ERR_TAP_PARSER_ERROR`
-
-An error representing a failing parser state. Additional information about
-the token causing the error is available via the `cause` property.
-
-<a id="ERR_TAP_VALIDATION_ERROR"></a>
-
-### `ERR_TAP_VALIDATION_ERROR`
-
-This error represents a failed TAP validation.
 
 <a id="ERR_TEST_FAILURE"></a>
 
@@ -3071,6 +3127,20 @@ try {
 }
 ```
 
+<a id="ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX"></a>
+
+### `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`
+
+<!-- YAML
+added:
+  - v23.7.0
+  - v22.14.0
+-->
+
+The provided TypeScript syntax is unsupported.
+This could happen when using TypeScript syntax that requires
+transformation with [type-stripping][].
+
 <a id="ERR_USE_AFTER_CLOSE"></a>
 
 ### `ERR_USE_AFTER_CLOSE`
@@ -3267,6 +3337,12 @@ The requested functionality is not supported in worker threads.
 ### `ERR_ZLIB_INITIALIZATION_FAILED`
 
 Creation of a [`zlib`][] object failed due to incorrect configuration.
+
+<a id="ERR_ZSTD_INVALID_PARAM"></a>
+
+### `ERR_ZSTD_INVALID_PARAM`
+
+An invalid parameter key was passed during construction of a Zstd stream.
 
 <a id="HPE_CHUNK_EXTENSIONS_OVERFLOW"></a>
 
@@ -3818,6 +3894,25 @@ removed: v10.0.0
 
 Used when an attempt is made to use a readable stream that has not implemented
 [`readable._read()`][].
+
+<a id="ERR_TAP_LEXER_ERROR"></a>
+
+### `ERR_TAP_LEXER_ERROR`
+
+An error representing a failing lexer state.
+
+<a id="ERR_TAP_PARSER_ERROR"></a>
+
+### `ERR_TAP_PARSER_ERROR`
+
+An error representing a failing parser state. Additional information about
+the token causing the error is available via the `cause` property.
+
+<a id="ERR_TAP_VALIDATION_ERROR"></a>
+
+### `ERR_TAP_VALIDATION_ERROR`
+
+This error represents a failed TAP validation.
 
 <a id="ERR_TLS_RENEGOTIATION_FAILED"></a>
 
