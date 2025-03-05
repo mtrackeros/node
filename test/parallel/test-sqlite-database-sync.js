@@ -1,4 +1,3 @@
-// Flags: --experimental-sqlite
 'use strict';
 require('../common');
 const tmpdir = require('../common/tmpdir');
@@ -24,12 +23,30 @@ suite('DatabaseSync() constructor', () => {
     });
   });
 
-  test('throws if database path is not a string', (t) => {
+  test('throws if database path is not a string, Uint8Array, or URL', (t) => {
     t.assert.throws(() => {
       new DatabaseSync();
     }, {
       code: 'ERR_INVALID_ARG_TYPE',
-      message: /The "path" argument must be a string/,
+      message: /The "path" argument must be a string, Uint8Array, or URL without null bytes/,
+    });
+  });
+
+  test('throws if the database location as Buffer contains null bytes', (t) => {
+    t.assert.throws(() => {
+      new DatabaseSync(Buffer.from('l\0cation'));
+    }, {
+      code: 'ERR_INVALID_ARG_TYPE',
+      message: 'The "path" argument must be a string, Uint8Array, or URL without null bytes.',
+    });
+  });
+
+  test('throws if the database location as string contains null bytes', (t) => {
+    t.assert.throws(() => {
+      new DatabaseSync('l\0cation');
+    }, {
+      code: 'ERR_INVALID_ARG_TYPE',
+      message: 'The "path" argument must be a string, Uint8Array, or URL without null bytes.',
     });
   });
 
@@ -49,6 +66,39 @@ suite('DatabaseSync() constructor', () => {
       code: 'ERR_INVALID_ARG_TYPE',
       message: /The "options\.open" argument must be a boolean/,
     });
+  });
+
+  test('throws if options.readOnly is provided but is not a boolean', (t) => {
+    t.assert.throws(() => {
+      new DatabaseSync('foo', { readOnly: 5 });
+    }, {
+      code: 'ERR_INVALID_ARG_TYPE',
+      message: /The "options\.readOnly" argument must be a boolean/,
+    });
+  });
+
+  test('is not read-only by default', (t) => {
+    const dbPath = nextDb();
+    const db = new DatabaseSync(dbPath);
+    db.exec('CREATE TABLE foo (id INTEGER PRIMARY KEY)');
+  });
+
+  test('is read-only if readOnly is set', (t) => {
+    const dbPath = nextDb();
+    {
+      const db = new DatabaseSync(dbPath);
+      db.exec('CREATE TABLE foo (id INTEGER PRIMARY KEY)');
+      db.close();
+    }
+    {
+      const db = new DatabaseSync(dbPath, { readOnly: true });
+      t.assert.throws(() => {
+        db.exec('CREATE TABLE bar (id INTEGER PRIMARY KEY)');
+      }, {
+        code: 'ERR_SQLITE_ERROR',
+        message: /attempt to write a readonly database/,
+      });
+    }
   });
 
   test('throws if options.enableForeignKeyConstraints is provided but is not a boolean', (t) => {
@@ -221,6 +271,15 @@ suite('DatabaseSync.prototype.exec()', () => {
     }, {
       code: 'ERR_SQLITE_ERROR',
       message: /syntax error/,
+    });
+  });
+
+  test('throws if the URL does not have the file: scheme', (t) => {
+    t.assert.throws(() => {
+      new DatabaseSync(new URL('http://example.com'));
+    }, {
+      code: 'ERR_INVALID_URL_SCHEME',
+      message: 'The URL must be of scheme file:',
     });
   });
 
